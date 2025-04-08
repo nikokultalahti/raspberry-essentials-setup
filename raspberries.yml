@@ -105,6 +105,23 @@
         name: unattended-upgrades
         state: started
         enabled: yes
+    
+    - name: Configure rsync server
+      lineinfile:
+        path: /etc/default/rsync
+        regexp: '^RSYNC_ENABLE='
+        line: RSYNC_ENABLE=true
+
+    - name: Copy rsync configuration
+      copy:
+        dest: /etc/
+        src: ./files/rsync/rsyncd.conf
+      
+    - name: Enable rsync
+      service:
+        name: rsync
+        state: started
+        enabled: yes
 
   handlers:
     - name: restart ssh
