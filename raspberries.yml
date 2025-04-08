@@ -1,0 +1,16 @@
+---
+
+- name: Basic setup
+  hosts: raspberries
+  become: yes
+  tasks:
+    # Update system
+    - name: Update apt
+      apt:
+        update_cache: true
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+
+...
