@@ -1,0 +1,13 @@
+# Template for Wireguard configuration file
+# Add in your own details and rename the file as wg0.conf
+
+[Interface]
+Address = 
+PrivateKey = 
+MTU = 
+
+[Peer]
+AllowedIPs = 
+Endpoint = 
+PersistentKeepalive = 
+PublicKey = 
