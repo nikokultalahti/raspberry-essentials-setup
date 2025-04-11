@@ -1,0 +1,5 @@
+# Exclude environmental variables, which should include username and password
+.env
+
+# Exclude Wireguard config file, that includes sensitive information
+wg0.conf
