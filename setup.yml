@@ -50,17 +50,17 @@
 
         state: present
  
-    #   # Configure fail2 ban
-    # - name: Create fail2ban jail.local file
-    #   copy:
-    #     dest: /etc/fail2ban/jail.local
-    #     src: ./files/fail2ban/jail.local
+      # Configure fail2 ban
+    - name: Create fail2ban jail.local file
+      copy:
+        dest: /etc/fail2ban/jail.local
+        src: ./files/fail2ban/jail.local
      
-    # - name: Enable fail2ban
-    #   service:
-    #     name: fail2ban
-    #     state: started
-    #     enabled: yes
+    - name: Enable fail2ban
+      service:
+        name: fail2ban
+        state: started
+        enabled: yes
      
       # Configure UFW to allow SSH connections
     - name: Allow SSH through UFW
@@ -114,15 +114,15 @@
         state: started
         enabled: yes
  
-    # # Create user for rsync
-    # - name: Create new user for rsync
-    #   user:
-    #     name: rsync
-    #     state: present
-    #     groups: users
-    #     append: true
-    #     password: "{{ RSYNC_USER_PASS | password_hash('512') }}"
-    #     create_home: yes
+    # Create user for rsync
+    - name: Create new user for rsync
+      user:
+        name: rsync
+        state: present
+        groups: users
+        append: true
+        password: "{{ RSYNC_USER_PASS | password_hash('512') }}"
+        create_home: yes
      
     # Enable rsync in configuraton files
     - name: Configure rsync server
@@ -142,6 +142,7 @@
       file:
         src: /etc/rsyncd.conf
         dest: /home/rsync/rsyncd.conf
+        owner: rsync
         state: link
  
     # Create backup folder
@@ -151,6 +152,7 @@
         state: directory
         recurse: yes
         owner: rsync
+        group: rsync
         mode: '777'
  
     # Set custom SSH configuration file to allow rsync user login with password
@@ -167,6 +169,15 @@
         name: rsync
         state: started
         enabled: yes
+    
+    # Set rsync user the owner recursively of all files in their home folder 
+    # (need to be done due to rsync log files path)
+    - name: Set rsync user and group owner of the home folder
+      file:
+        path: /home/rsync
+        recourse: yes
+        owner: rsync
+        group: rsync
 
     # Copy Wireguard configuration file
     - name: Copy WireGuard configuration file
