@@ -1,19 +1,19 @@
 ---
-
-- name: Basic setup
+- name: Secure Rasperry Pi setup as rsync server and wireguard client
   hosts: raspberries
   become: yes
   tasks:
-    # Update system
+
+    # Update the apt package chace to ge tthe latest package information
     - name: Update apt
       apt:
         update_cache: true
-
+    # Upgrade all isntalled packages to their latest versions
     - name: Upgrade all packages
       apt:
         upgrade: dist
-
-    # Configure SSH daemon for security
+ 
+    # Configure SSH for security
     - name: Configure secure SSH configuration
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -30,7 +30,8 @@
         - { regexp: '^#?AllowAgentForwarding', line: 'AllowAgentForwarding no' }
         - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
       notify: restart ssh
-
+ 
+      # Install security packages
     - name: Install security packages
       apt:
         name:
@@ -38,44 +39,50 @@
           - ufw
           - unattended-upgrades
         state: present
-
+ 
+      # Install essential application packages
     - name: Install application packages
       apt:
         name:
           - cockpit
           - rsync
           - wireguard
-        state: present
 
-    - name: Create fail2ban jail.local file
-      copy:
-        dest: /etc/fail2ban/jail.local
-        src: ./files/fail2ban/jail.local
-    
-    - name: Enable fail2ban
-      service:
-        name: fail2ban
-        state: started
-        enabled: yes
-    
+        state: present
+ 
+    #   # Configure fail2 ban
+    # - name: Create fail2ban jail.local file
+    #   copy:
+    #     dest: /etc/fail2ban/jail.local
+    #     src: ./files/fail2ban/jail.local
+     
+    # - name: Enable fail2ban
+    #   service:
+    #     name: fail2ban
+    #     state: started
+    #     enabled: yes
+     
+      # Configure UFW to allow SSH connections
     - name: Allow SSH through UFW
       ufw:
         rule: allow
         name: OpenSSH
         state: enabled
-
+       
+      # Enable UFW with default deny policy 
     - name: Enable UFW
       ufw:
         state: enabled
         policy: deny
-
+ 
+      # Enable automatic updates through debconf
     - name: Enable automatic updates
       debconf:
         name: unattended-upgrades
         question: unattended-upgrades/enable_auto_updates
         value: "true"
         vtype: boolean
-
+ 
     # Configure unattended-upgrades behavior
     - name: Configure unattended-upgrades
       blockinfile:
@@ -93,39 +100,95 @@
           Unattended-Upgrade::InstallOnShutdown "false";      # Don't install on shutdown
           Unattended-Upgrade::Remove-Unused-Dependencies "true";  # Clean up
           Unattended-Upgrade::Automatic-Reboot "false";       # Don't reboot automatically
-    
+     
     # Configure automatic update schedule
     - name: Configure automatic updates
       copy:
         dest: /etc/apt/apt.conf.d/20auto-upgrades
         src: ./files/apt/20auto-upgrades
-
+ 
+    # Start and enable unattended-upgrades service
     - name: Start and enable unattended-upgrades service
       service:
         name: unattended-upgrades
         state: started
         enabled: yes
-    
+ 
+    # # Create user for rsync
+    # - name: Create new user for rsync
+    #   user:
+    #     name: rsync
+    #     state: present
+    #     groups: users
+    #     append: true
+    #     password: "{{ RSYNC_USER_PASS | password_hash('512') }}"
+    #     create_home: yes
+     
+    # Enable rsync in configuraton files
     - name: Configure rsync server
       lineinfile:
         path: /etc/default/rsync
         regexp: '^RSYNC_ENABLE='
         line: RSYNC_ENABLE=true
-
+ 
+    # Copy rsync configuration files
     - name: Copy rsync configuration
       copy:
         dest: /etc/
         src: ./files/rsync/rsyncd.conf
-      
+     
+    # Create symlink for configuration files for rsync user
+    - name: Create symlink for configuration file to rsync user home folder
+      file:
+        src: /etc/rsyncd.conf
+        dest: /home/rsync/rsyncd.conf
+        state: link
+ 
+    # Create backup folder
+    - name: Create backup folder to rsync user home folder
+      file:
+        path: /home/rsync/backups
+        state: directory
+        recurse: yes
+        owner: rsync
+        mode: '777'
+ 
+    # Set custom SSH configuration file to allow rsync user login with password
+    - name: Copy custom SSH configuration file to allow rsync password login
+      copy:
+        src: ./files/rsync/99-custom.conf
+        dest: /etc/ssh/sshd_config.d/99-custom.conf
+        mode: '0644'
+      notify: restart ssh
+       
+    # Start rsync 
     - name: Enable rsync
       service:
         name: rsync
         state: started
         enabled: yes
 
+    # Copy Wireguard configuration file
+    - name: Copy WireGuard configuration file
+      copy:
+        src: ./files/wireguard/wg0.conf
+        dest: /etc/wireguard/wg0.conf
+        mode: '0644'
+    
+    # Start Wireguard and enable on boot
+    - name: Start Wireguard
+      systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: started 
+ 
   handlers:
     - name: restart ssh
       service:
         name: ssh
         state: restarted
+  
+  vars:
+    ANSIBLE_USER: '{{ lookup("env", "ANSIBLE_USER") }}'
+    RSYNC_USER_PASS: '{{ lookup("env", "RSYNC_USER_PASS") }}'
 ...
